@@ -74,10 +74,11 @@ class LLMAPI(sampler.LLM):
         prompt = '\n'.join([content, self._additional_prompt])
         while True:
             try:
-                conn = http.client.HTTPSConnection("api.chatanywhere.com.cn")
+                conn = http.client.HTTPSConnection("api.deepseek.com")
                 payload = json.dumps({
                     "max_tokens": 512,
-                    "model": "gpt-3.5-turbo",
+                    "model": "deepseek-chat",
+                    "temperature": 1.0,
                     "messages": [
                         {
                             "role": "user",
@@ -86,8 +87,7 @@ class LLMAPI(sampler.LLM):
                     ]
                 })
                 headers = {
-                    'Authorization': 'Bearer sk-ys02zx......(replace with your own)......',
-                    'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
+                    'Authorization': 'Bearer sk-085c14782c7241c3a4f677973393a4f0',
                     'Content-Type': 'application/json'
                 }
                 conn.request("POST", "/v1/chat/completions", payload, headers)
@@ -99,7 +99,8 @@ class LLMAPI(sampler.LLM):
                 if self._trim:
                     response = _trim_preface_of_body(response)
                 return response
-            except Exception:
+            except Exception as e:
+                print(f"[LLM API Error] {e}, retrying...")
                 continue
 
 

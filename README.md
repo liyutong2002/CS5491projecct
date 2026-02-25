@@ -108,3 +108,22 @@ tensorboard --logdir funsearch_llm_api
 ## Issue
 
 If you encounter any difficulty using the code, please do not hesitate to submit an issue!
+
+##运行步骤
+# ① 安装依赖
+pip install numpy scipy absl-py torch tensorboard ortools lkh
+
+# ② 生成测试数据
+python tsp_datasets/download_tsplib.py
+
+# ③ 验证所有基线算法能跑通
+python tsp_utils.py
+
+# ④ 跑完整基准测试（对比NN/Cheapest/Farthest/2opt/OR-Tools等）
+python benchmark_tsp.py --tsplib_dir tsp_datasets/
+
+# ⑤ 配好DeepSeek API后，运行FunSearch进化搜索（核心）
+python funsearch_tsp_llm_api.py
+
+# ⑥ 进化完成后，对比FunSearch结果和所有基线
+python benchmark_tsp.py --tsplib_dir tsp_datasets/ --log_dir logs/funsearch_tsp/

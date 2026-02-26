@@ -355,6 +355,78 @@ def ortools_solve(dist_matrix: np.ndarray, time_limit_seconds: int = 30) -> Opti
 #     except Exception as e:
 #         print(f"  [LKH] Error: {e}")
 #     return None
+# def lkh_solve(dist_matrix: np.ndarray, coords: np.ndarray = None,
+#               lkh_path: str = r"C:\Users\liyutong\Desktop\LKH-3.0.13\LKH.exe",
+#               runs: int = 5) -> Optional[List[int]]:
+#     """Solve TSP using LKH-3 (SOTA heuristic, <1% gap). Direct call without lkh package."""
+#     import subprocess
+#     import tempfile
+
+#     n = len(dist_matrix)
+#     try:
+#         with tempfile.TemporaryDirectory() as tmpdir:
+#             # Write TSPLIB problem file
+#             prob_file = os.path.join(tmpdir, "problem.tsp")
+#             with open(prob_file, 'w') as f:
+#                 f.write(f"NAME: temp\n")
+#                 f.write(f"TYPE: TSP\n")
+#                 f.write(f"DIMENSION: {n}\n")
+#                 if coords is not None:
+#                     f.write(f"EDGE_WEIGHT_TYPE: EUC_2D\n")
+#                     f.write(f"NODE_COORD_SECTION\n")
+#                     for i in range(n):
+#                         f.write(f"{i+1} {coords[i][0]:.6f} {coords[i][1]:.6f}\n")
+#                 else:
+#                     f.write(f"EDGE_WEIGHT_TYPE: EXPLICIT\n")
+#                     f.write(f"EDGE_WEIGHT_FORMAT: FULL_MATRIX\n")
+#                     f.write(f"EDGE_WEIGHT_SECTION\n")
+#                     for i in range(n):
+#                         row = " ".join(str(int(dist_matrix[i][j])) for j in range(n))
+#                         f.write(row + "\n")
+#                 f.write("EOF\n")
+
+#             # Write LKH parameter file
+#             par_file = os.path.join(tmpdir, "params.par")
+#             tour_file = os.path.join(tmpdir, "output.tour")
+#             with open(par_file, 'w') as f:
+#                 f.write(f"PROBLEM_FILE = {prob_file}\n")
+#                 f.write(f"OUTPUT_TOUR_FILE = {tour_file}\n")
+#                 f.write(f"RUNS = {runs}\n")
+#                 f.write(f"SEED = 42\n")
+
+#             # Run LKH
+#             result = subprocess.run(
+#                 [lkh_path, par_file],
+#                 capture_output=True, text=True, timeout=120
+#             )
+
+#             # Parse output tour
+#             if os.path.exists(tour_file):
+#                 tour = []
+#                 reading_tour = False
+#                 with open(tour_file, 'r') as f:
+#                     for line in f:
+#                         line = line.strip()
+#                         if line == "TOUR_SECTION":
+#                             reading_tour = True
+#                             continue
+#                         if line == "-1" or line == "EOF":
+#                             reading_tour = False
+#                             continue
+#                         if reading_tour:
+#                             city = int(line) - 1  # Convert to 0-indexed
+#                             if city >= 0:
+#                                 tour.append(city)
+#                 if len(tour) == n:
+#                     return tour
+
+#     except subprocess.TimeoutExpired:
+#         print(f"  [LKH] Timeout after 120 seconds")
+#     except FileNotFoundError:
+#         print(f"  [LKH] Binary not found at '{lkh_path}'")
+#     except Exception as e:
+#         print(f"  [LKH] Error: {e}")
+#     return None
 def lkh_solve(dist_matrix: np.ndarray, coords: np.ndarray = None,
               lkh_path: str = r"C:\Users\liyutong\Desktop\LKH-3.0.13\LKH.exe",
               runs: int = 5) -> Optional[List[int]]:
@@ -427,7 +499,6 @@ def lkh_solve(dist_matrix: np.ndarray, coords: np.ndarray = None,
     except Exception as e:
         print(f"  [LKH] Error: {e}")
     return None
-
 # =============================================================================
 # Gurobi Exact Solver (optional)
 # Ref: https://github.com/wouterkool/attention-learn-to-route/blob/master/

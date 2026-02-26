@@ -93,24 +93,37 @@ class LLMAPI(sampler.LLM):
 
         while True:
             try:
-                conn = http.client.HTTPSConnection("api.deepseek.com")
-                payload = json.dumps({
+                # =============================================================
+                # Option 1: OpenAI-compatible API (default)
+                # =============================================================
+               conn = http.client.HTTPSConnection("api.deepseek.com")
+               payload = json.dumps({
                     "max_tokens": 1024,
                     "model": "deepseek-coder",
                     "temperature": 0.8,
                     "messages": [
-                        {"role": "system", "content": "You are an expert algorithm designer. Write creative Python functions using numpy."},
-                        {"role": "user", "content": prompt}
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are an expert algorithm designer for combinatorial optimization. "
+                                "You write creative, efficient Python functions using numpy."
+                            )
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
                     ]
                 })
-                headers = {
+               headers = {
                     'Authorization': 'Bearer sk-085c14782c7241c3a4f677973393a4f0',
                     'Content-Type': 'application/json'
                 }
-                conn.request("POST", "/v1/chat/completions", payload, headers)
-                res = conn.getresponse()
-                data = json.loads(res.read().decode("utf-8"))
-                response = data['choices'][0]['message']['content']
+               conn.request("POST", "/v1/chat/completions", payload, headers)
+               res = conn.getresponse()
+               data = res.read().decode("utf-8")
+               data = json.loads(data)
+               response = data['choices'][0]['message']['content']
 
                 # =============================================================
                 # Option 2: Anthropic API (uncomment to use)
@@ -151,9 +164,9 @@ class LLMAPI(sampler.LLM):
                 # response = data['choices'][0]['message']['content']
 
                 # Trim function
-                if self._trim:
+               if self._trim:
                     response = _trim_preface_of_body(response)
-                return response
+               return response
 
             except Exception as e:
                 print(f"LLM API error: {e}, retrying...")
@@ -397,29 +410,42 @@ def priority(
 
 if __name__ == '__main__':
     # =========================================================================
-    # Configuration
+    # Dataset: split into TRAINING set and TEST set
+    # Following the proposal: train on small instances, test on larger ones
     # =========================================================================
 
-    # Select dataset
-    # Option 1: Use random instances (default, no external files needed)
-    #tsp_datasets = tsp_utils.datasets
-    tsp_datasets = tsp_utils.load_tsplib_dir('tsp_datasets/')
-    # Option 2: Load TSPLIB instances from a directory
-    # tsp_datasets = tsp_utils.load_tsplib_dir('tsp_datasets/')
+    # Load all available instances
+    all_datasets = tsp_utils.load_tsplib_dir('tsp_datasets/')
+    if not all_datasets:
+        print("No TSPLIB files found in tsp_datasets/, using random instances...")
+        all_datasets = tsp_utils.datasets
 
-    # Option 3: Load a single TSPLIB instance
-    # tsp_datasets = {'eil51': tsp_utils.load_tsplib_instance('tsp_datasets/eil51.tsp')}
-
-    # For quick testing, use only small instances
-    small_instances = {
-        k: v for k, v in tsp_datasets.items()
+    # Training set: small instances (n <= 50) — FunSearch evolves on these
+    # e.g., rand20, rand30, rand50 (or eil51 if downloaded)
+    train_datasets = {
+        k: v for k, v in all_datasets.items()
         if v['num_cities'] <= 50
     }
-    if not small_instances:
-        small_instances = tsp_datasets
 
-    print(f"Using {len(small_instances)} TSP instances:")
-    for name, inst in small_instances.items():
+    # Test set: larger instances (n > 50) — evaluate generalization
+    # e.g., rand75, rand100, rand150, rand200 (or kroA100, ch150 if downloaded)
+    test_datasets = {
+        k: v for k, v in all_datasets.items()
+        if v['num_cities'] > 50
+    }
+
+    if not train_datasets:
+        train_datasets = all_datasets
+
+    print("=" * 60)
+    print("DATASET SPLIT")
+    print("=" * 60)
+    print(f"\nTraining set ({len(train_datasets)} instances) — FunSearch evolves on these:")
+    for name, inst in sorted(train_datasets.items(), key=lambda x: x[1]['num_cities']):
+        print(f"  {name}: {inst['num_cities']} cities")
+
+    print(f"\nTest set ({len(test_datasets)} instances) — evaluate generalization:")
+    for name, inst in sorted(test_datasets.items(), key=lambda x: x[1]['num_cities']):
         print(f"  {name}: {inst['num_cities']} cities")
 
     # =========================================================================
@@ -436,21 +462,32 @@ if __name__ == '__main__':
     )
 
     # Maximum number of LLM samples before stopping
-    # Set to None for endless loop
-    global_max_sample_num = 20
+    # Recommend: 100+ for meaningful evolution, None for endless loop
+    global_max_sample_num = 200
 
     # =========================================================================
-    # Launch FunSearch
+    # Launch FunSearch on TRAINING set only
     # =========================================================================
     print("\n" + "=" * 60)
-    print("Starting FunSearch for TSP")
+    print("Starting FunSearch for TSP (training on small instances)")
     print("=" * 60)
 
     funsearch.main(
         specification=specification,
-        inputs=small_instances,
+        inputs=train_datasets,       # <-- evolve on training set only
         config=funsearch_config,
         max_sample_nums=global_max_sample_num,
         class_config=class_config,
         log_dir='logs/funsearch_tsp',
     )
+
+    # =========================================================================
+    # After evolution: print test set info for benchmark
+    # =========================================================================
+    print("\n" + "=" * 60)
+    print("FunSearch evolution complete!")
+    print("=" * 60)
+    print(f"\nTo evaluate on test set, run:")
+    print(f"  python benchmark_tsp.py --tsplib_dir tsp_datasets/ --log_dir logs/funsearch_tsp/")
+    print(f"\nThis will compare the evolved function against all baselines")
+    print(f"on both training and test instances.")
